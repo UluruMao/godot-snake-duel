@@ -47,7 +47,7 @@ func clear_turns() -> void:
 func _input(event: InputEvent) -> void:
 	if not controlled or model == null or not model.alive or not is_visible_in_tree():
 		return
-	if event is InputEventKey and event.pressed and not event.echo:
+	if GameControls.is_plain_press(event):
 		var direction := Vector2i.ZERO
 		match event.keycode:
 			KEY_UP, KEY_W: direction = Vector2i.UP

@@ -61,10 +61,10 @@ func _ready() -> void:
 	policies.add_theme_constant_override("separation", 8)
 	column.add_child(policies)
 	_mine_button = UIStyle.button("Mine forecast", true)
-	_mine_button.pressed.connect(func(): action_requested.emit(KEY_F9))
+	_mine_button.pressed.connect(func(): action_requested.emit(GameControls.MINE_POLICY))
 	policies.add_child(_mine_button)
 	_diamond_button = UIStyle.button("Diamond plans", true)
-	_diamond_button.pressed.connect(func(): action_requested.emit(KEY_F10))
+	_diamond_button.pressed.connect(func(): action_requested.emit(GameControls.DIAMOND_POLICY))
 	policies.add_child(_diamond_button)
 	var more := UIStyle.button("More diagnostics", true)
 	more.toggle_mode = true

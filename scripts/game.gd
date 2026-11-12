@@ -150,7 +150,7 @@ func _process(delta: float) -> void:
 		_sync_views()
 
 func _begin_planning() -> void:
-	_pending = PlanningBatch.new(world, _profiles, _planning_version, Input.is_action_pressed("boost"))
+	_pending = PlanningBatch.new(world, _profiles, _planning_version, Input.is_action_pressed("boost", true))
 	var actors: Dictionary = _pending.prepared.world.snakes
 	if actors.has("player") and actors.player.alive and (SpeedRules.due(actors.player) or actors.player.chance_ticks > 0):
 		_pending.player_queued = not _player._turn_queue.is_empty()
@@ -190,53 +190,62 @@ func _exit_tree() -> void:
 
 
 func _input(event: InputEvent) -> void:
-	if not event is InputEventKey or not event.pressed or event.echo:
+	if not GameControls.is_plain_press(event):
 		return
 	if state != State.PLAYING and state != State.OVER:
 		return
+	# Let popups receive navigation/confirmation without firing game commands.
+	if _scenario_menu_open:
+		return
+	if _help_panel.visible:
+		if event.keycode in [KEY_H, KEY_ESCAPE]:
+			_help_panel.visible = false
+			get_viewport().set_input_as_handled()
+			_sync_views()
+		return
 	if state == State.OVER:
 		if event.keycode == KEY_R: start_game()
-		elif event.keycode == KEY_F3: _select_scenario(1); _scenario_picker.show_popup()
+		elif event.keycode == GameControls.SCENARIOS: _select_scenario(1); _scenario_picker.show_popup()
 		return
 	match event.keycode:
-		KEY_F1:
+		GameControls.INSPECTOR:
 			_set_play_mode(not _debug_visible)
-		KEY_F11:
+		GameControls.PERFORMANCE:
 			_performance_visible = not _performance_visible
-		KEY_F2:
+		GameControls.SELECT_ENEMY:
 			var ids: Array = []
 			for id in _profiles:
 				if world.snakes.has(id):
 					ids.append(id)
 			if not ids.is_empty():
 				_selected = ids[(ids.find(_selected) + 1) % ids.size()]
-		KEY_F3:
+		GameControls.SCENARIOS:
 			_scenario_picker.show_popup()
 		KEY_H:
 			_help_panel.visible = not _help_panel.visible
-		KEY_F4:
+		GameControls.PLANNER:
 			_cancel_planning()
 			if _profiles.has(_selected):
 				var p: EnemyProfile = _profiles[_selected]
 				p.planner = (p.planner + 1) % EnemyProfile.PLANNER_NAMES.size()
 				_decisions[_selected] = SnakeAI.choose_move(world, _selected, p)
-		KEY_F9:
+		GameControls.MINE_POLICY:
 			if _debug_visible and _profiles.has(_selected):
 				_cancel_planning()
 				_profiles[_selected].mine_prediction = not _profiles[_selected].mine_prediction
 				_decisions[_selected] = SnakeAI.choose_move(world, _selected, _profiles[_selected])
-		KEY_F10:
+		GameControls.DIAMOND_POLICY:
 			if _debug_visible and _profiles.has(_selected):
 				_cancel_planning()
 				_profiles[_selected].diamond_planning = not _profiles[_selected].diamond_planning
 				_decisions[_selected] = SnakeAI.choose_move(world, _selected, _profiles[_selected])
-		KEY_F6:
+		GameControls.NEW_SEED:
 			_seed_value += 1
 			start_game()
-		KEY_F5, KEY_F7, KEY_F8:
+		GameControls.STAR, GameControls.SPEED_UP, GameControls.SLOW_DOWN:
 			if _debug_visible and state == State.PLAYING and world.snakes.has("player"):
 				_cancel_planning()
-				var kind := ItemRules.STAR if event.keycode == KEY_F5 else (ItemRules.SPEED_UP if event.keycode == KEY_F7 else ItemRules.SLOW_DOWN)
+				var kind := ItemRules.STAR if event.keycode == GameControls.STAR else (ItemRules.SPEED_UP if event.keycode == GameControls.SPEED_UP else ItemRules.SLOW_DOWN)
 				world = world.copy()
 				var actor: SnakeState = world.snakes.player
 				if actor.has_effect(kind, world.tick):
@@ -257,6 +266,9 @@ func _input(event: InputEvent) -> void:
 				paused = true
 				_accumulator = 0.0
 				_simulation_tick()
+		_:
+			return
+	get_viewport().set_input_as_handled()
 	_sync_views()
 
 func _ui_key(code: int) -> void:
@@ -294,8 +306,8 @@ func _build_controls(layer: CanvasLayer) -> void:
 	_scenario_picker.position = Vector2(280, 34)
 	_scenario_picker.size = Vector2(410, 44)
 	_scenario_picker.add_theme_font_size_override("font_size", 19)
-	_scenario_picker.tooltip_text = "F3 · Choose a scenario"
-	var picker_title := UIStyle.label("SCENARIOS [F3]", 11, UIStyle.MUTED)
+	_scenario_picker.tooltip_text = "L · Choose a scenario"
+	var picker_title := UIStyle.label("SCENARIOS [L]", 11, UIStyle.MUTED)
 	picker_title.position = Vector2(282, 20)
 	_controls.add_child(picker_title)
 	for index in AIScenarios.NAMES.size():
@@ -305,7 +317,7 @@ func _build_controls(layer: CanvasLayer) -> void:
 	_scenario_picker.get_popup().about_to_popup.connect(func(): _scenario_menu_open = true)
 	_scenario_picker.get_popup().popup_hide.connect(func(): _scenario_menu_open = false)
 	_controls.add_child(_scenario_picker)
-	var mode_title := UIStyle.label("PLAY MODE [F1]", 11, UIStyle.MUTED)
+	var mode_title := UIStyle.label("PLAY MODE [I]", 11, UIStyle.MUTED)
 	mode_title.position = Vector2(1246, 20)
 	_controls.add_child(mode_title)
 	_mode_picker = OptionButton.new()
@@ -326,7 +338,7 @@ func _build_controls(layer: CanvasLayer) -> void:
 	_pause_button = UIStyle.button("Pause [P]", true)
 	_pause_button.pressed.connect(func(): _ui_key(KEY_P))
 	tools.add_child(_pause_button)
-	for spec in [["Step [N]", KEY_N], ["Reset [R]", KEY_R], ["Seed [F6]", KEY_F6]]:
+	for spec in [["Step [N]", KEY_N], ["Reset [R]", KEY_R], ["Seed [G]", GameControls.NEW_SEED]]:
 		var button := UIStyle.button(spec[0], true)
 		button.pressed.connect(_ui_key.bind(int(spec[1])))
 		_lab_tools.append(button)
@@ -351,7 +363,7 @@ func _build_controls(layer: CanvasLayer) -> void:
 	column.add_theme_constant_override("separation", 20)
 	_help_panel.add_child(column)
 	column.add_child(UIStyle.label("CONTROLS", 28))
-	column.add_child(UIStyle.label("WASD / Arrows   Move\nSpace   Hold to boost\nP / Esc   Pause\nF12 / Alt+Enter   Fullscreen\n\nF1   AI inspector       F3   Scenario picker\nF2   Select enemy       F4   Cycle planner\nN   Step one tick        R   Reset seed\nF6   New seed\nF5   Star   ·   F7   Speed Up   ·   F8   Slow Down\nF9   Mine prediction   ·   F10   Diamond planning\nF11   Performance details", 19, UIStyle.MUTED))
+	column.add_child(UIStyle.label("WASD / Arrows   Move\nSpace   Hold to boost\nP / Esc   Pause\nAlt+Enter   Fullscreen\n\nI   AI inspector       L   Scenario picker\nQ   Select enemy       V   Cycle planner\nN   Step one tick        R   Reset seed\nG   New seed\n1   Star   ·   2   Speed Up   ·   3   Slow Down\nM   Mine prediction   ·   B   Diamond planning\nT   Performance details", 19, UIStyle.MUTED))
 	var close := UIStyle.button("Close [H]", true)
 	close.pressed.connect(func(): _help_panel.visible = false)
 	column.add_child(close)
@@ -359,7 +371,7 @@ func _build_controls(layer: CanvasLayer) -> void:
 
 func _realtime_tick() -> void:
 	var started := Time.get_ticks_usec()
-	var prepared := SnakeSimulation.begin_tick(world, Input.is_action_pressed("boost"))
+	var prepared := SnakeSimulation.begin_tick(world, Input.is_action_pressed("boost", true))
 	var staged: WorldSnapshot = prepared.world
 	staged.begin_runtime_validation()
 	var intents := {}
@@ -386,7 +398,7 @@ func _simulation_tick() -> void:
 	var started := Time.get_ticks_usec()
 	performance_stats.ai_usec = 0
 	performance_stats.due_actors = 0
-	var boosting := Input.is_action_pressed("boost")
+	var boosting := Input.is_action_pressed("boost", true)
 	# Phase changes must be visible before collecting due intents and before
 	# AI forecasts. The simulator repeats this idempotently for direct callers.
 	var prepared := SnakeSimulation.begin_tick(world, boosting)
@@ -468,7 +480,7 @@ func _sync_views() -> void:
 	if _debug.visible:
 		var mode: int = _profiles[_selected].planner if _profiles.has(_selected) else 0
 		var planner_name: String = EnemyProfile.PLANNER_NAMES[mode] if _profiles.has(_selected) else "Awaiting enemy"
-		var comparison := " | F10 diamonds " + ("ON" if _profiles[_selected].diamond_planning else "OFF") if _profiles.has(_selected) and world.snakes.has(_selected) and EnemySpawnRules.kind(world.snakes[_selected]) == "purple" else ""
+		var comparison := " | B diamonds " + ("ON" if _profiles[_selected].diamond_planning else "OFF") if _profiles.has(_selected) and world.snakes.has(_selected) and EnemySpawnRules.kind(world.snakes[_selected]) == "purple" else ""
 		_debug.refresh(world, _decisions.get(_selected), _selected, "%s | seed %d | tick %d | %s | %s%s" % [AIScenarios.NAMES[_scenario_index], _seed_value, world.tick, "PAUSED" if paused else "RUNNING", planner_name, comparison], _profiles.get(_selected))
 	_hud.set_boost_state(world.snakes.has("player") and world.snakes.player.boosting, world.snakes.has("player"), 50.0 / world.snakes.player.period if world.snakes.has("player") else SpeedRules.NORMAL_SPEED)
 	_hud.set_effects(world)
@@ -481,13 +493,13 @@ func _sync_views() -> void:
 	_lab_hint.visible = _scenario_index != 0
 	_lab_hint.text = AIScenarios.DESCRIPTIONS[_scenario_index]
 	_status.visible = state == State.PLAYING and not _performance_visible
-	_status.text = "F2 Select enemy   ·   F4 Planner   ·   F5 / F7 / F8 Effects" if _debug_visible else "WASD / Arrows  Move   ·   Space  Boost   ·   Esc  Pause   ·   F12  Fullscreen"
+	_status.text = "Q Select enemy   ·   V Planner   ·   1 / 2 / 3 Effects" if _debug_visible else "WASD / Arrows  Move   ·   Space  Boost   ·   Esc  Pause   ·   Alt+Enter  Fullscreen"
 	_performance_label.visible = _performance_visible and state == State.PLAYING
 	if _performance_label.visible and Time.get_ticks_msec() >= _performance_due:
 		_performance_due = Time.get_ticks_msec() + 100
-		_performance_label.text = "F11 performance | tick %.1fms | AI %.1fms / %d due | backlog %.0fms\nslowdown %.2fs | budget limits %d | mines %d | movers %d | %s" % [performance_stats.tick_usec / 1000.0, performance_stats.ai_usec / 1000.0, performance_stats.due_actors, _accumulator * 1000, performance_stats.dropped_seconds, performance_stats.budget_exhaustions, world.mines.size(), world.moving_pickups.size(), "PLANNING" if _pending != null else "READY"]
+		_performance_label.text = "T performance | tick %.1fms | AI %.1fms / %d due | backlog %.0fms\nslowdown %.2fs | budget limits %d | mines %d | movers %d | %s" % [performance_stats.tick_usec / 1000.0, performance_stats.ai_usec / 1000.0, performance_stats.due_actors, _accumulator * 1000, performance_stats.dropped_seconds, performance_stats.budget_exhaustions, world.mines.size(), world.moving_pickups.size(), "PLANNING" if _pending != null else "READY"]
 		if early_planning_enabled:
-			_performance_label.text = "Tick %.1fms · safety %.1fms · early plans %d ready / %d late\nSlowdown %.2fs · work limits %d · F11 hide" % [performance_stats.tick_usec / 1000.0, performance_stats.ai_usec / 1000.0, _ahead.stats.ready, _ahead.stats.late, performance_stats.dropped_seconds, performance_stats.budget_exhaustions]
+			_performance_label.text = "Tick %.1fms · safety %.1fms · early plans %d ready / %d late\nSlowdown %.2fs · work limits %d · T hide" % [performance_stats.tick_usec / 1000.0, performance_stats.ai_usec / 1000.0, _ahead.stats.ready, _ahead.stats.late, performance_stats.dropped_seconds, performance_stats.budget_exhaustions]
 
 func _sync_roster() -> void:
 	for id in _profiles.keys():
@@ -547,7 +559,7 @@ func start_game() -> void:
 	performance_stats = {"dropped_seconds": 0.0, "ticks_this_frame": 0, "tick_usec": 0, "ai_usec": 0, "due_actors": 0, "budget_exhaustions": 0}
 	_ahead.stats = {"started": 0, "ready": 0, "late": 0, "invalidated": 0, "worker_usec": 0, "completed": 0}
 	paused = _scenario_index != 0
-	# Scenario choice and presentation mode are independent; F1 never resets a lab.
+	# Scenario choice and presentation mode are independent; I never resets a lab.
 	for view: SnakePlayer in _views.values():
 		view.reset()
 	for id in world.snakes:
@@ -692,7 +704,7 @@ func _build_home() -> void:
 	labs.add_theme_font_size_override("font_size", 28)
 	labs.pressed.connect(func(): _home_mode.select(1); _home_scenario.select(1); _on_start_pressed(); _scenario_picker.show_popup())
 	buttons.add_child(labs)
-	var hints := UIStyle.label("WASD / Arrows  Move   ·   Space  Boost\nF1  Switch mode   ·   F3  Choose scenario   ·   F12  Fullscreen", 22, UIStyle.MUTED)
+	var hints := UIStyle.label("WASD / Arrows  Move   ·   Space  Boost\nI  Switch mode   ·   L  Choose scenario   ·   Alt+Enter  Fullscreen", 22, UIStyle.MUTED)
 	hints.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(hints)
 	_home_btn.grab_focus.call_deferred()
