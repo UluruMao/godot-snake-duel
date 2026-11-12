@@ -1,0 +1,10 @@
+[gd_scene format=3 uid="uid://cy3ixbtl5bup5"]
+
+[ext_resource type="Script" uid="uid://df5ym3xj3qow0" path="res://scripts/main.gd" id="1_o5qli"]
+[ext_resource type="Resource" path="res://resources/enemy_spawning.tres" id="2_spawns"]
+[ext_resource type="Resource" path="res://resources/drops.tres" id="3_drops"]
+
+[node name="Main" type="Node2D" unique_id=1151721570]
+script = ExtResource("1_o5qli")
+enemy_spawning = ExtResource("2_spawns")
+drops = ExtResource("3_drops")
