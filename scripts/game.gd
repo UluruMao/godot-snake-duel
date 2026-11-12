@@ -102,10 +102,11 @@ func _ready() -> void:
 	_debug.action_requested.connect(_ui_key)
 	_debug.visible = false
 	debug_layer.add_child(_debug)
-	_status = Label.new()
+	_status = UIStyle.label("", 18)
 	_status.position = Vector2(44, UILayout.FOOTER_Y)
-	_status.add_theme_font_size_override("font_size", 16)
-	_status.add_theme_color_override("font_color", UIStyle.MUTED)
+	_status.size = Vector2(1186, 32)
+	_status.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_status.clip_text = true
 	debug_layer.add_child(_status)
 	_performance_label = Label.new()
 	_performance_label.position = Vector2(44, UILayout.FOOTER_Y)
@@ -363,7 +364,7 @@ func _build_controls(layer: CanvasLayer) -> void:
 	column.add_theme_constant_override("separation", 20)
 	_help_panel.add_child(column)
 	column.add_child(UIStyle.label("CONTROLS", 28))
-	column.add_child(UIStyle.label("WASD / Arrows   Move\nSpace   Hold to boost\nP / Esc   Pause\nAlt+Enter   Fullscreen\n\nI   AI inspector       L   Scenario picker\nQ   Select enemy       V   Cycle planner\nN   Step one tick        R   Reset seed\nG   New seed\n1   Star   ·   2   Speed Up   ·   3   Slow Down\nM   Mine prediction   ·   B   Diamond planning\nT   Performance details", 19, UIStyle.MUTED))
+	column.add_child(UIStyle.label("WASD / Arrows   Move\nSpace   Hold to boost\nP / Esc   Pause\nAlt+Enter   Fullscreen\n\nI   AI inspector       L   Scenario picker\nQ   Select enemy       V   Cycle planner\nN   Step one tick        R   Reset seed\nG   New seed\n1   Invulnerability (Star)\n2   Speed Up\n3   Slow Down\nM   Mine prediction   ·   B   Diamond planning\nT   Performance details", 19, UIStyle.MUTED))
 	var close := UIStyle.button("Close [H]", true)
 	close.pressed.connect(func(): _help_panel.visible = false)
 	column.add_child(close)
@@ -493,7 +494,7 @@ func _sync_views() -> void:
 	_lab_hint.visible = _scenario_index != 0
 	_lab_hint.text = AIScenarios.DESCRIPTIONS[_scenario_index]
 	_status.visible = state == State.PLAYING and not _performance_visible
-	_status.text = "Q Select enemy   ·   V Planner   ·   1 / 2 / 3 Effects" if _debug_visible else "WASD / Arrows  Move   ·   Space  Boost   ·   Esc  Pause   ·   Alt+Enter  Fullscreen"
+	_status.text = "[Q] Select enemy   ·   [V] Planner   |   [1] Invulnerability   ·   [2] Speed Up   ·   [3] Slow Down" if _debug_visible else "WASD / Arrows  Move   ·   Space  Boost   ·   Esc  Pause   ·   Alt+Enter  Fullscreen"
 	_performance_label.visible = _performance_visible and state == State.PLAYING
 	if _performance_label.visible and Time.get_ticks_msec() >= _performance_due:
 		_performance_due = Time.get_ticks_msec() + 100
