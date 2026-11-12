@@ -10,9 +10,9 @@ Two features define the project:
 - **Visible AI reasoning.** Developer mode displays the selected enemy's target, route, explored space, possible opponent movements and reasons for rejecting a move.
 - **A retro CRT presentation.** Curvature, scanlines, glow, grain and pixel lettering give the game the appearance of an old computer display, with a restrained grey arena and coloured enemies.
 
-![The retro CRT arena with the player, a bean reward and Purple’s validated route](assets/screenshots/overview.png)
+![Snake Duel opening menu with Normal mode and Live arena selected](assets/screenshots/titlepage.png)
 
-*The CRT display combines pixel lettering and a curved arena with inspectable AI. Here, Purple’s yellow route has passed food and tail-escape validation; the player has just earned a 1,000-point bean reward.*
+*The opening menu presents independent play-mode and scenario selectors within the retro CRT display.*
 
 ## Run the game
 
@@ -39,7 +39,7 @@ The project uses the **Compatibility** renderer. The scene, interface, procedura
 | R | Reset the current scenario with the same seed |
 | G | Advance the seed and reset |
 | V | Change the selected enemy's planner for comparison |
-| 1 / 2 / 3 | In Developer mode, toggle Star / Speed Up / Slow Down |
+| 1 / 2 / 3 | In Developer mode, toggle Invulnerability (Star) / Speed Up / Slow Down |
 | M | In Developer mode, compare predictive and current-position mine avoidance |
 | B | In Developer mode, toggle Purple's moving-diamond planning |
 | T | Show runtime planning and simulation diagnostics |
@@ -101,9 +101,13 @@ This gives growth a continuing value. It also makes deliberate shortening during
 
 Each newly crossed 50,000-point threshold requests a mine, capped at eight including warnings and reserved spawns. A large bomb payout can therefore clear the arena and introduce new warning mines after scoring.
 
-![Bomb and loot scenario showing a 285,000-point payout and the cleared enemies’ drops](assets/screenshots/bomb-and-scoring.png)
+![Bomb and loot before collection, with all four enemy archetypes alive and a score of zero](assets/screenshots/bomb_and_scoring_before.png)
 
-*Bomb and loot scenario: at player length five, the bomb pickup and one bounty from each archetype award 285,000 points. Enemy drops remain on the field after the clear.*
+*Before collection: the player is length five, all four enemy archetypes are alive, and the bomb is positioned at the player’s head.*
+
+![Bomb and loot after collection, showing a 285,000-point score and drops from the eliminated enemies](assets/screenshots/bomb_and_scoring_after.png)
+
+*After collection: the bomb pickup and one bounty from each archetype award 285,000 points. The enemies are cleared and their death drops remain on the field.*
 
 ## Core AI design
 
@@ -133,9 +137,9 @@ Purple simulates a proposed reward route through the game's movement and growth 
 
 Mine forecasts include activation, bouncing and movement through the interval until the snake can act again. Opponent-head forecasts consider visible direction, body, speed and movement phase. They do not read queued player controls or another AI's selected future action. Mines are assumed to persist until their destruction is observed.
 
-![Mine prediction scenario with future mine positions and unsafe moves marked beside Purple](assets/screenshots/mine-prediction.png)
+![Mine prediction scenario with future mine positions and unsafe moves marked beside Purple](assets/screenshots/mine_prediction.png)
 
-*Timed mine prediction: projected hazard positions and rejected directions explain why Purple abandons the food route and moves toward open space.*
+*Timed mine prediction: future-position markers and mine-related move rejections explain Purple’s escape choice. The inspector shows forecasting enabled.*
 
 ### 4. Rank objectives within the best safety tier
 
@@ -150,11 +154,11 @@ Pink prefers the shortest acceptable bean route. Purple adds growth and escape v
 
 When no food plan qualifies, food rewards are ignored and the enemy prioritizes escape. These checks reduce avoidable deaths; changing opponents and finite lookahead still make survival uncertain.
 
-![Purple escaping beside a narrow food pocket with its decision reason visible](assets/screenshots/purple-escape.png)
+![Purple in escape mode beside a narrow food pocket, with Safety collector selected in the inspector](assets/screenshots/purple_unsafe_food.png)
 
-*Food safety scenario: Purple remains in escape mode when the reward inside the narrow pocket does not offer an acceptable continuation.*
+*Food safety with the shared safety collector selected on Purple: the snake preserves open space beside a narrow food pocket. The inspector identifies the wall-blocked direction and revalidated continuation.*
 
-![Red circling beside the player with route and opponent forecasts visible](assets/screenshots/red-tactics.png)
+![Red circling beside the player with route and opponent forecasts visible](assets/screenshots/red_tactics.png)
 
 *Red’s tactical movement: the inspector exposes the circling objective, route, head-contact rejection and current first-step validation. Cyan lines show possible player movement.*
 
@@ -182,7 +186,8 @@ SnakeDuel_GitHub/
 ├── README.md
 ├── THIRD_PARTY_NOTICES.md
 ├── icon.svg
-├── screenshots/             # Gameplay and AI images used by this README
+├── assets/
+│   └── screenshots/           # Gameplay and AI images used by this README
 ├── scenes/
 │   └── main.tscn
 ├── resources/
