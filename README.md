@@ -1,4 +1,4 @@
-# Snake Duel
+# godot-snake-duel
 
 **Solo personal project · October–November 2026**  
 **Godot 4.7.2 · GDScript · Godot shader language · Playable prototype**
@@ -9,6 +9,10 @@ Two features define the project:
 
 - **Visible AI reasoning.** Developer mode displays the selected enemy's target, route, explored space, possible opponent movements and reasons for rejecting a move.
 - **A retro CRT presentation.** Curvature, scanlines, glow, grain and pixel lettering give the game the appearance of an old computer display, with a restrained grey arena and coloured enemies.
+
+![The retro CRT arena with the player, a bean reward and Purple’s validated route](screenshots/overview.png)
+
+*The CRT display combines pixel lettering and a curved arena with inspectable AI. Here, Purple’s yellow route has passed food and tail-escape validation; the player has just earned a 1,000-point bean reward.*
 
 ## Run the game
 
@@ -95,6 +99,10 @@ This gives growth a continuing value. It also makes deliberate shortening during
 
 Each newly crossed 50,000-point threshold requests a mine, capped at eight including warnings and reserved spawns. A large bomb payout can therefore clear the arena and introduce new warning mines after scoring.
 
+![Bomb and loot scenario showing a 285,000-point payout and the cleared enemies’ drops](screenshots/bomb-and-scoring.png)
+
+*Bomb and loot scenario: at player length five, the bomb pickup and one bounty from each archetype award 285,000 points. Enemy drops remain on the field after the clear.*
+
 ## Core AI design
 
 The enemies use **custom BFS, flood fill, shared body-and-growth simulation, bounded forecasts and utility ranking**. The game does not use machine learning, minimax or MCTS.
@@ -123,6 +131,10 @@ Purple simulates a proposed reward route through the game's movement and growth 
 
 Mine forecasts include activation, bouncing and movement through the interval until the snake can act again. Opponent-head forecasts consider visible direction, body, speed and movement phase. They do not read queued player controls or another AI's selected future action. Mines are assumed to persist until their destruction is observed.
 
+![Mine prediction scenario with future mine positions and unsafe moves marked beside Purple](screenshots/mine-prediction.png)
+
+*Timed mine prediction: projected hazard positions and rejected directions explain why Purple abandons the food route and moves toward open space.*
+
 ### 4. Rank objectives within the best safety tier
 
 An attractive reward cannot override immediate legality or a better safety tier. Purple's initial normalized food-plan utility is:
@@ -135,6 +147,14 @@ U = 3 × FoodAccess + 4 × AvailableSpace
 Pink prefers the shortest acceptable bean route. Purple adds growth and escape validation. Red rewards early interception and reduction of the player's reachable space. Golden rewards exits, head clearance and lower threat, with no attack or food-pursuit term. A player with Star causes Red to abandon attacks and Golden to increase separation.
 
 When no food plan qualifies, food rewards are ignored and the enemy prioritizes escape. These checks reduce avoidable deaths; changing opponents and finite lookahead still make survival uncertain.
+
+![Purple escaping beside a narrow food pocket with its decision reason visible](screenshots/purple-escape.png)
+
+*Food safety scenario: Purple remains in escape mode when the reward inside the narrow pocket does not offer an acceptable continuation.*
+
+![Red circling beside the player with route and opponent forecasts visible](screenshots/red-tactics.png)
+
+*Red’s tactical movement: the inspector exposes the circling objective, route, head-contact rejection and current first-step validation. Cyan lines show possible player movement.*
 
 ### 5. Make decisions inspectable
 
@@ -160,6 +180,7 @@ SnakeDuel_GitHub/
 ├── README.md
 ├── THIRD_PARTY_NOTICES.md
 ├── icon.svg
+├── screenshots/             # Gameplay and AI images used by this README
 ├── scenes/
 │   └── main.tscn
 ├── resources/
