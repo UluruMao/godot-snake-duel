@@ -10,6 +10,14 @@ var _queue := PackedInt32Array()
 var _seen := PackedInt32Array()
 var _blocked := PackedByteArray()
 var _generation := 0
+var native_kernel: RefCounted
+
+func _init(use_native := true) -> void:
+	native_kernel = NativeAIBridge.create_kernel(use_native)
+
+func _account_native(result: Dictionary) -> void:
+	expansions += int(result.spent)
+	exhausted = exhausted or result.exhausted
 
 func _prepare(w: WorldSnapshot, blocked: Dictionary) -> void:
 	var size := w.width * w.height
@@ -48,6 +56,13 @@ func spend_many(count: int) -> bool:
 
 ## Iterative BFS doubles as flood fill and a distance map. Fixed neighbor order.
 func scan(w: WorldSnapshot, start: Vector2i, blocked: Dictionary, goal := Vector2i(-1, -1)) -> Dictionary:
+	if native_kernel != null:
+		var result: Dictionary = native_kernel.scan(w.width, w.height, start, blocked, goal, maxi(0, limit - expansions))
+		assert(not result.has("error"), "Invalid native search input")
+		_account_native(result)
+		result.erase("spent")
+		result.erase("exhausted")
+		return result
 	_prepare(w, blocked)
 	var size := w.width * w.height
 	var origin := start.y * w.width + start.x
@@ -84,6 +99,12 @@ func scan(w: WorldSnapshot, start: Vector2i, blocked: Dictionary, goal := Vector
 	return {"cells": cells, "parents": parents, "distances": distances, "width": w.width, "height": w.height, "complete": complete}
 
 func area_at_least(w: WorldSnapshot, start: Vector2i, blocked: Dictionary, required: int) -> bool:
+	if native_kernel != null:
+		var result: Dictionary = native_kernel.area_at_least(w.width, w.height, start, blocked, required, maxi(0, limit - expansions))
+		assert(not result.has("error"), "Invalid native flood-fill input")
+		_account_native(result)
+		last_area = int(result.area)
+		return result.valid
 	_prepare(w, blocked)
 	var size := w.width * w.height
 	var origin := start.y * w.width + start.x
@@ -108,6 +129,7 @@ func area_at_least(w: WorldSnapshot, start: Vector2i, blocked: Dictionary, requi
 	return tail >= required
 
 func area_cells(w: WorldSnapshot) -> Array[Vector2i]:
+	if native_kernel != null: return native_kernel.area_cells(w.width, last_area)
 	var cells: Array[Vector2i] = []
 	for i in last_area: cells.append(Vector2i(_queue[i] % w.width, _queue[i] / w.width))
 	return cells
@@ -121,6 +143,8 @@ static func contains(scan_result: Dictionary, cell: Vector2i) -> bool:
 	return distance(scan_result, cell, -1) >= 0
 
 static func path(scan_result: Dictionary, goal: Vector2i) -> Array[Vector2i]:
+	var native := NativeAIBridge.create_kernel()
+	if native != null: return native.path(scan_result, goal)
 	var result: Array[Vector2i] = []
 	if not contains(scan_result, goal):
 		return result

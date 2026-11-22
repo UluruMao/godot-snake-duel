@@ -139,7 +139,7 @@ func refresh(w: WorldSnapshot, d: AIDecision, id: String, _caption: String, acti
 		lines += "\n\nWaiting for a movement decision"
 	_label.text = lines
 	_legend.text = "Yellow: route   Blue: %s\nCyan: opponent forecasts" % ("plan area" if decision != null and decision.planning_status == "early plan validated" else "checked space")
-	var detail := "Tick %d · %.2fs\nBeans %d · Mines %d · Obstacles %d\nQueued drops %d" % [w.tick, w.tick * 0.02, w.beans.size(), w.mines.size(), w.obstacles.size(), w.pending_drops.size()]
+	var detail := "Backend: %s\nTick %d · %.2fs\nBeans %d · Mines %d · Obstacles %d\nQueued drops %d" % [NativeAIBridge.description(), w.tick, w.tick * 0.02, w.beans.size(), w.mines.size(), w.obstacles.size(), w.pending_drops.size()]
 	if decision != null:
 		detail += "\nPlanning: %s\nSource %d · validated %d\nSafety %d · strategy %d nodes" % [decision.planning_status, decision.planning_source_tick, decision.validated_tick, decision.safety_expansions, decision.strategic_expansions]
 		if decision.validated_tick >= 0: detail += "\nSafety %.2f ms · strategy %.2f ms%s" % [decision.duration_usec / 1000.0, decision.strategic_duration_usec / 1000.0, " (truncated)" if decision.strategy_exhausted else ""]

@@ -1,0 +1,12 @@
+from pathlib import Path
+
+root = Path(Dir("..").abspath)
+bindings = root / ".godot/native_ai/godot-cpp"
+env = SConscript(str(bindings / "SConstruct"), {"api_version": "4.7"})
+env = env.Clone() # Keep our warning policy off third-party translation units.
+# OS supports bindings diagnostics; RefCounted is the only exposed base class.
+if env["platform"] == "windows":
+    env.Append(CXXFLAGS=["/W4", "/WX", "/external:anglebrackets", "/external:W0", "/permissive-", "/utf-8", "/fp:precise"])
+obj = env.SharedObject(str(root / ".godot/native_ai/obj" / ("NativeSnakeAI" + env["suffix"] + env["OBJSUFFIX"])), "src/NativeSnakeAI.cpp")
+library = env.SharedLibrary(str(root / "native/bin" / ("snake_ai" + env["suffix"] + env["SHLIBSUFFIX"])), [obj])
+Default(library)

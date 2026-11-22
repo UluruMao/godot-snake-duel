@@ -1,0 +1,6 @@
+{
+  "godot_cpp_repository": "https://github.com/godotengine/godot-cpp.git",
+  "godot_cpp_revision": "7fd5c4bc3efda6487fd6e6486c50016faa622f92",
+  "scons_version": "4.10.1",
+  "godot_api": "4.7"
+}

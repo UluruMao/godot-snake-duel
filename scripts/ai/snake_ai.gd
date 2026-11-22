@@ -155,7 +155,10 @@ static func choose_move(w: WorldSnapshot, id: String, profile: EnemyProfile) -> 
 		var food_access: float = minf(1.0, c.reward_multiplier / (1.0 + c.distance)) if c.food_valid else 0.0
 		var space := clampf(float(c.area) / (2.0 * candidate_required), 0.0, 1.0)
 		var escapes := float(c.viable_continuations if advanced else c.continuations) / 3.0
-		c.utility = profile.food_weight * food_access + profile.space_weight * space + profile.escape_weight * escapes - profile.threat_weight * c.threat
+		if search.native_kernel != null:
+			c.utility = search.native_kernel.food_utility(c, PackedFloat64Array([profile.food_weight, profile.space_weight, profile.escape_weight, profile.threat_weight]), advanced)
+		else:
+			c.utility = profile.food_weight * food_access + profile.space_weight * space + profile.escape_weight * escapes - profile.threat_weight * c.threat
 	if tactical:
 		return _tactical_choice(w, id, profile, decision, search, required, started)
 	var best: Dictionary = {}
@@ -167,13 +170,17 @@ static func choose_move(w: WorldSnapshot, id: String, profile: EnemyProfile) -> 
 	for c in decision.candidates:
 		if c.legal and c.tier == best_tier and c.food_valid:
 			food_options = true
-	for c in decision.candidates:
-		if not c.legal or c.tier != best_tier:
-			continue
-		if food_options and not c.food_valid:
-			continue
-		if best.is_empty() or _better(c, best, food_options, profile):
-			best = c
+	if search.native_kernel != null:
+		var selected: int = search.native_kernel.choose_collector(decision.candidates, profile.planner)
+		if selected >= 0: best = decision.candidates[selected]
+	else:
+		for c in decision.candidates:
+			if not c.legal or c.tier != best_tier:
+				continue
+			if food_options and not c.food_valid:
+				continue
+			if best.is_empty() or _better(c, best, food_options, profile):
+				best = c
 	if not best.is_empty():
 		decision.direction = best.direction
 		decision.reachable.assign(best.reachable)
@@ -296,16 +303,20 @@ static func choose_current(w: WorldSnapshot, id: String, profile: EnemyProfile, 
 		if eligible and direction == planned.direction and c.tier == 2:
 			preferred = c
 			break # No alternative can outrank the maximum safety tier.
-	for c: Dictionary in d.candidates:
-		if not c.evaluated or not c.legal: continue
-		var better := best.is_empty()
-		if not best.is_empty():
-			better = c.tier > best.tier
-			if c.tier == best.tier:
-				var evade := profile.planner == EnemyProfile.Planner.GOLDEN or (star_threat and profile.planner == EnemyProfile.Planner.RED)
-				if evade and c.continuations == best.continuations and is_equal_approx(c.threat, best.threat) and not is_equal_approx(c.clearance, best.clearance): better = c.clearance > best.clearance
-				else: better = _better(c, best, false, profile)
-		if better: best = c
+	if threat_search.native_kernel != null:
+		var selected: int = threat_search.native_kernel.choose_runtime(d.candidates, profile.planner, star_threat)
+		if selected >= 0: best = d.candidates[selected]
+	else:
+		for c: Dictionary in d.candidates:
+			if not c.evaluated or not c.legal: continue
+			var better := best.is_empty()
+			if not best.is_empty():
+				better = c.tier > best.tier
+				if c.tier == best.tier:
+					var evade := profile.planner == EnemyProfile.Planner.GOLDEN or (star_threat and profile.planner == EnemyProfile.Planner.RED)
+					if evade and c.continuations == best.continuations and is_equal_approx(c.threat, best.threat) and not is_equal_approx(c.clearance, best.clearance): better = c.clearance > best.clearance
+					else: better = _better(c, best, false, profile)
+			if better: best = c
 	if planned != null:
 		d.planning_source_tick = planned.snapshot_tick
 		d.strategic_expansions = planned.expansions
@@ -434,7 +445,7 @@ static func _tactical_choice(w: WorldSnapshot, id: String, p: EnemyProfile, d: A
 		# An emergency never receives an attack reward. Preserve the shared
 		# continuation/threat/space fallback even when all graph work is exhausted.
 		if best_tier < 2 or c.scan.is_empty() or not c.scan.complete or search.exhausted:
-			if best.is_empty() or _better(c, best, false, p):
+			if best.is_empty() or (search.native_kernel.better(c, best, false, p.planner) if search.native_kernel != null else _better(c, best, false, p)):
 				best = c
 			continue
 		var next := SnakeSimulation.plan_move(w, id, c.direction)
@@ -445,7 +456,10 @@ static func _tactical_choice(w: WorldSnapshot, id: String, p: EnemyProfile, d: A
 			# No food, player-blocking, length contest or kill term exists here.
 			var clearance := _head_clearance(next, id, moved.cells[0])
 			var clearance_weight := maxf(p.clearance_weight, p.star_clearance_weight if star_threat else p.retreat_clearance_weight)
-			c.tactical_score = maxf(p.escape_weight, p.retreat_escape_weight) * mobility + maxf(p.space_weight, p.retreat_space_weight) * space + clearance_weight * clearance - maxf(p.threat_weight, p.retreat_threat_weight) * c.threat
+			if search.native_kernel != null:
+				c.tactical_score = search.native_kernel.evade_utility(c, required, clearance, PackedFloat64Array([p.escape_weight, p.retreat_escape_weight, p.space_weight, p.retreat_space_weight, p.clearance_weight, p.star_clearance_weight, p.retreat_clearance_weight, p.threat_weight, p.retreat_threat_weight]), star_threat)
+			else:
+				c.tactical_score = maxf(p.escape_weight, p.retreat_escape_weight) * mobility + maxf(p.space_weight, p.retreat_space_weight) * space + clearance_weight * clearance - maxf(p.threat_weight, p.retreat_threat_weight) * c.threat
 			c.tactic = "EVADE" if clearance < 1.0 else "ROAM"
 			if p.planner == EnemyProfile.Planner.RED:
 				c.tactic = "RETREAT STAR" if star_threat else "RETREAT DUEL"
@@ -458,7 +472,10 @@ static func _tactical_choice(w: WorldSnapshot, id: String, p: EnemyProfile, d: A
 				var after_area := _player_area(next, player.id, search)
 				if not search.exhausted:
 					restriction = clampf(1.0 - float(after_area) / base_player_area, 0.0, 1.0)
-			c.tactical_score = p.intercept_weight * interception.value + p.block_weight * restriction + p.escape_weight * mobility + p.space_weight * space - p.threat_weight * c.threat
+			if search.native_kernel != null:
+				c.tactical_score = search.native_kernel.attack_utility(c, required, interception.value, restriction, PackedFloat64Array([p.intercept_weight, p.block_weight, p.escape_weight, p.space_weight, p.threat_weight]))
+			else:
+				c.tactical_score = p.intercept_weight * interception.value + p.block_weight * restriction + p.escape_weight * mobility + p.space_weight * space - p.threat_weight * c.threat
 			c.target = interception.target
 			c.tactic = "BLOCK" if restriction > 0.1 else interception.tactic
 			c.tactical_path = GridSearch.path(c.scan, c.target)

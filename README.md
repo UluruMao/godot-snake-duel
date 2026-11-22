@@ -1,9 +1,12 @@
 # godot-snake-duel
 
-**Solo personal project · October–November 2026**  
-**Godot 4.7.2 · GDScript · Godot shader language · Playable prototype**
+**Solo personal project · October–November 2026**
+
+**Godot 4.7.2 · GDScript + C++17 · Godot shader language · Playable prototype**
 
 Snake Duel expands classic Snake into an arena shared with four kinds of AI opponent. I developed the game as a personal portfolio project, focusing on enemy behaviour, pathfinding, decision making and the communication of those decisions to the player.
+
+The [portfolio case study](https://ulurumao.github.io/snake-duel.html) explains the design and measured engineering results.
 
 Two features define the project:
 
@@ -22,6 +25,8 @@ Two features define the project:
 4. Choose **Normal + Live arena** to play, or **Developer + Food safety** to begin inspecting the AI.
 
 The project uses the **Compatibility** renderer. The scene, interface, procedural graphics, shader and sound generation are included; no asset download, editor plugin, external service or API key is required.
+
+Windows x86_64 C++ libraries are included for the validated Godot version; no compiler is needed to play. The native build currently targets Windows only. Developer mode → **More diagnostics** displays `Backend: C++ GDExtension`. Run with `-- --gdscript-ai` to compare the retained GDScript reference backend. See [native build and architecture](native/README.md).
 
 ### Controls
 
@@ -162,6 +167,8 @@ When no food plan qualifies, food rewards are ignored and the enemy prioritizes 
 
 *Red’s tactical movement: the inspector exposes the circling objective, route, head-contact rejection and current first-step validation. Cyan lines show possible player movement.*
 
+Beyond graph traversal, the AI uses bounded depth-first escape search, body-and-growth route replay, arrival-time interception, rival-head movement envelopes and swept-contact geometry. Red scores the reduction in the player's reachable area; Golden scores clearance and mobility. These calculations are bounded forecasts and heuristics rather than guarantees of survival.
+
 ### 5. Make decisions inspectable
 
 The AI inspector shows targets, behaviour, reasons, rejected directions, reachable area and work costs. Yellow lines show proposed routes, blue shading shows the associated explored area, and cyan dashed lines show possible player routes. Earlier strategic plan area is labelled separately from freshly checked space; unevaluated alternatives are not presented as rejected moves.
@@ -178,6 +185,35 @@ The 16 playable scenarios preserve focused demonstrations of food pockets, cross
 - **Configurable resources:** exported enemy and drop resources expose speed, length, cooldowns, scores, limits and safety parameters in the Godot Inspector.
 - **Procedural presentation:** the arena, snakes and pixel lettering are drawn in code. Short sound effects use generated audio samples, and the CRT appearance comes from a canvas shader.
 
+### Live C++ integration
+
+The playable project calls a **C++17 GDExtension** for BFS, flood fill, path reconstruction, food/evasion/attack utility and safety-tier candidate ranking. GDScript supplies metrics from the authoritative simulator and retains growth, hazard forecasts, tail-route replay, worker scheduling and presentation. Whole searches cross the bridge, with independent native scratch storage per worker.
+
+[NativeSnakeAI.cpp](native/src/NativeSnakeAI.cpp) is **333 total lines**, including its opening explanation and comments. It demonstrates reusable grid storage, a bounded work counter, deterministic ranking, a `RefCounted` interface, Godot registration macros and cell operators. This is source used by the live game, rather than a separate translation for submission.
+
+All **291 detailed pre-integration decisions match exactly**. In local CPU probes, 30 × 25 BFS plus path reconstruction fell from **1.950 to 0.047 ms**, including bridge conversion; a complete clear-board Purple decision fell from **19.163 to 12.913 ms**. Hazard-heavy simulation improved less, and some rendered worker/latency measures worsened. These results do not establish a universal FPS or survival improvement. Build instructions, verification and limitations are documented in [native/README.md](native/README.md).
+
+![Live scenario inspector identifying the C++ GDExtension backend](assets/screenshots/native_backend.png)
+
+*The native backend is visible in More diagnostics; the existing paths, candidate explanations and CRT display remain available.*
+
+### Native CPU measurements
+
+These are the later **language-integration** results. They are separate from the earlier **simulation/scheduling** results in the movement-stutter section below. Local sequential probes used Godot 4.7.2 on Windows x86_64, optimised MSVC libraries, seed 42 and three warmups, followed by 250 graph queries or 20 complete decisions per fixed snapshot. Times include the language bridge.
+
+| CPU workload | GDScript mean | Native mean | Time reduction |
+|---|---:|---:|---:|
+| 30 × 25 BFS + path | 1.950 ms | 0.047 ms | 97.6% |
+| Purple · clear field | 19.163 ms | 12.913 ms | 32.6% |
+| Red · clear field | 8.788 ms | 4.816 ms | 45.2% |
+| Golden · clear field | 14.160 ms | 8.317 ms | 41.3% |
+| Purple · eight mines, sixteen diamonds | 30.024 ms | 27.345 ms | 8.9% |
+| Purple · long bodies, hazards, 192 obstacles | 26.367 ms | 26.088 ms | 1.1% |
+
+BFS plus path reconstruction was approximately **41.7× faster** in this probe. All non-timing outputs and logical work counts matched. The smaller gains in dense Purple layouts identify the remaining simulation and hazard cost.
+
+Rendered results were mixed: three of four worst world-update gaps increased. For one Purple with hazards, the worst gap rose from **56.60 to 61.65 ms**. The native measurements establish lower search CPU cost, with no general FPS, latency or survival improvement claim. Both DLL configurations were loaded in Godot; a standalone executable export remains untested because matching export templates were absent.
+
 ### Source structure
 
 ```text
@@ -193,6 +229,12 @@ SnakeDuel_GitHub/
 ├── resources/
 │   ├── enemy_spawning.tres
 │   └── drops.tres
+├── native/
+│   ├── src/NativeSnakeAI.cpp   # Live native search, utility and ranking
+│   ├── bin/                    # Windows x86_64 debug/release libraries
+│   └── snake_ai.gdextension    # Engine registration and library paths
+├── tools/
+│   └── build_native_ai.ps1      # Pinned native dependency/build setup
 ├── scripts/
 │   ├── main.gd                 # Viewport, CRT host and fullscreen handling
 │   ├── game.gd                 # Input, game flow, tick scheduling and UI
@@ -202,7 +244,8 @@ SnakeDuel_GitHub/
 │   ├── audio_fx.gd             # Procedural sound generation
 │   └── ai/
 │       ├── snake_ai.gd         # Safety, reward plans and tactical ranking
-│       ├── grid_search.gd      # BFS, flood fill and path reconstruction
+│       ├── grid_search.gd      # Native search adapter and reference backend
+│       ├── native_ai_bridge.gd # Runtime backend lookup
 │       ├── snake_simulation.gd # Shared movement, contact and reward rules
 │       ├── world_snapshot.gd   # World state and isolated prediction copies
 │       ├── enemy_profile.gd    # Archetype objectives and planning weights
@@ -249,7 +292,7 @@ An earlier local comparison used Godot 4.7.2, the same 1152 × 648 CRT view and 
 
 The four-Purple heavy case reduced the longest update gap by about 83% and increased simulation throughput by about 50%. That case's rendered-frame 95th percentile also increased from about 16.7 to 18.5 ms, and the single-Purple heavy case retained a roughly 60 ms worst update gap. These short workload measurements do not establish a universal frame-rate or survival improvement. Dense hazards and longer sessions remain optimization targets.
 
-The development regression suite contains **213 tests and six scene smoke checks**, covering rules, prediction isolation, growth, effects, timing, spawning, drops and early-plan validation. That suite is maintained in the development project; this folder is the playable runtime distribution.
+The development regression suite contains **221 tests and six scene smoke checks**, covering rules, prediction isolation, growth, effects, timing, spawning, drops and early-plan validation. That suite is maintained in the development project; this folder is the playable runtime distribution.
 
 ## Other design problems I resolved
 
@@ -269,6 +312,10 @@ Select **Main** in `scenes/main.tscn`:
 
 The resources are saved in [enemy_spawning.tres](resources/enemy_spawning.tres) and [drops.tres](resources/drops.tres). Utility defaults live in [enemy_profile.gd](scripts/ai/enemy_profile.gd); speed composition is defined in [speed_rules.gd](scripts/ai/speed_rules.gd).
 
+## Contribution and assistance
+
+This is a solo personal project. I defined the gameplay rules, enemy archetypes, visual direction and performance goals. Codex assisted with implementation, debugging, native integration and automated verification. The AI requirements and measured limitations are documented here so that the scope of the work remains clear.
+
 ## Inspiration and references
 
 Gameplay inspiration includes classic Snake and Snake Duel from *Zenless Zone Zero*. This is an independent implementation with its own AI policies and CRT presentation; reference screenshots and videos are not distributed with the project.
@@ -279,4 +326,4 @@ Algorithm concepts were adapted to this game's growth, multiple snakes, collisio
 - [chynl/snake graph-search implementation](https://github.com/chynl/snake/blob/main/src/agents/graph.py) — reference pattern of simulating food collection and checking tail access.
 - [David Graham, An Introduction to Utility Theory](https://www.gameaipro.com/GameAIPro/GameAIPro_Chapter09_An_Introduction_to_Utility_Theory.pdf) — normalized decision factors and configurable utility ranking.
 
-These are conceptual references, not runtime dependencies. The GDScript implementation is written for this game. Third-party icon and engine credits are recorded in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+These are conceptual references, not runtime dependencies. The GDScript and C++ implementation is written for this game. The godot-cpp binding is a build dependency, pinned and credited with its MIT notice. Third-party icon, engine and binding credits are recorded in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
