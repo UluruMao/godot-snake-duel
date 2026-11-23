@@ -314,7 +314,12 @@ The resources are saved in [enemy_spawning.tres](resources/enemy_spawning.tres) 
 
 ## Contribution and assistance
 
-This is a solo personal project. I defined the gameplay rules, enemy archetypes, visual direction and performance goals. Codex assisted with implementation, debugging, native integration and automated verification. The AI requirements and measured limitations are documented here so that the scope of the work remains clear.
+This is my solo game project. I defined the gameplay, enemy behavior and goals.
+I designed the code structure and wrote the class skeletons, defining each
+class's responsibilities, attributes and methods, and the core data structures.
+Codex helped fill in the method bodies and detailed implementation logic within
+that structure, and assisted with debugging, verification and documentation.
+I directed the work and reviewed all deliverables
 
 ## Inspiration and references
 
